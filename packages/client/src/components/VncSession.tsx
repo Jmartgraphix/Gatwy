@@ -4,7 +4,9 @@ import { getWsTicket } from '../lib/wsTicket';
 import { DisconnectOverlay } from './DisconnectOverlay';
 import { VncControlPanel } from './VncControlPanel';
 import { VncMobileKeyboard } from './VncMobileKeyboard';
+import { VncTouchPad } from './VncTouchPad';
 import { applyVncPointerMap } from '../lib/vncPointerMap';
+import { loadVncTouchMode, saveVncTouchMode, type VncTouchMode } from '../lib/vncTouchMode';
 
 interface VncSessionProps {
   connectionId: string;
@@ -22,6 +24,7 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   const [reconnectCount, setReconnectCount] = useState(0);
+  const [touchMode, setTouchMode] = useState<VncTouchMode>(() => loadVncTouchMode());
 
   function setAndNotify(s: 'connecting' | 'connected' | 'disconnected') {
     setStatus(s);
@@ -31,6 +34,11 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
   const handleReconnect = useCallback(() => {
     setErrorMsg('');
     setReconnectCount((n) => n + 1);
+  }, []);
+
+  const handleTouchModeChange = useCallback((mode: VncTouchMode) => {
+    setTouchMode(mode);
+    saveVncTouchMode(mode);
   }, []);
 
   const handleDisconnect = useCallback(() => {
@@ -217,12 +225,17 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
       </div>
 
       <div className="flex flex-row flex-1 overflow-hidden relative">
-        <div ref={containerRef} className="flex-1 overflow-hidden" style={{ background: '#000' }} />
+        <div className="flex-1 overflow-hidden relative" style={{ background: '#000' }}>
+          <div ref={containerRef} className="absolute inset-0" />
+          <VncTouchPad hostRef={containerRef} enabled={status === 'connected' && touchMode === 'touchpad'} />
+        </div>
         <VncControlPanel
           rfbRef={rfbRef}
           status={status}
           sessionRef={sessionRef}
           onDisconnect={handleDisconnect}
+          touchMode={touchMode}
+          onTouchModeChange={handleTouchModeChange}
         />
         <VncMobileKeyboard rfbRef={rfbRef} status={status} />
       </div>
