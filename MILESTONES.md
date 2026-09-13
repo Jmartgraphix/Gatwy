@@ -10,14 +10,16 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 **Window drag (confirmed):** `602f829` — long-press then drag, or tap then drag, holds left button.
 
-**Right-click polish (in test):** Moonlight-style two-finger tap. Aim with one finger, plant a second finger. Do **not** move the remote cursor for the second finger. Small one-finger deadzone so planting the second finger does not slide off a folder.
+**Right-click polish (confirmed by user):** `a834729` — Moonlight-style two-finger tap. Aim with one finger, plant a second finger. Do **not** move the remote cursor for the second finger.
+
+**Two-finger scroll (in test):** Lock the remote pointer for the whole two-finger gesture, including when Safari reports 1 leftover finger. Two-finger motion is wheel only. Slightly stronger wheel scale so browser pages scroll without dragging the cursor off-screen.
 
 Keep:
 
 - Extra overlay cursor gone
 - Remote VNC cursor visible and usable
 - One-finger move / tap / hold-drag / freeze-free double-tap
-- Two-finger scroll after a real two-finger drag
+- Two-finger tap right-click without moving the cursor
 
 Do not reintroduce:
 
@@ -38,12 +40,13 @@ Do not reintroduce:
 - [x] Double-tap on iPad does not freeze (`a7182a3`)
 - [x] Double-tap = left click, cursor still visible (`a7182a3`)
 - [x] Touchpad: drag a Steam Deck / KDE window (`602f829`)
+- [x] Right-click: aim with one finger, tap a second finger, cursor stays on the folder (`a834729`)
 
 ### In test
 
-- [ ] Right-click: aim with one finger, tap a second finger, cursor stays on the folder
-- [ ] Two-finger tap does not nudge the pointer
-- [ ] Two-finger drag still scrolls (after leaving the two-finger deadzone)
+- [ ] Two-finger scroll on a browser page does not fling the cursor off-screen
+- [ ] Two-finger scroll still moves the page
+- [ ] One-finger cursor move still works after lifting both fingers
 
 ## What we already learned
 
@@ -57,6 +60,7 @@ Do not reintroduce:
 | Window `mouseup` after each canvas click (`a7182a3`) | **Freeze gone.** Cursor still visible. |
 | Long-press then drag / tap then drag (`602f829`) | **Window drag works.** |
 | Two-finger tap moved the cursor (midpoint / first-finger jitter) | Right-click missed the folder. Moonlight iOS `RelativeTouchHandler` only moves on finger 1; two-finger tap clicks **where the cursor already is**. |
+| Two-finger scroll (`a834729`) | Page scrolled slowly **and** the leftover finger moved the cursor off-screen (Safari often reports 1 touch mid-scroll). |
 
 ## Moonlight (iOS relative / trackpad) — what we copied
 
@@ -78,13 +82,12 @@ From `moonlight-ios` `RelativeTouchHandler.m` and `moonlight-qt` `reltouch.cpp`:
 | Long-press (~350ms) then drag | Left button down, drag windows, up on lift |
 | Tap, then immediately drag | Same window-drag (tap-and-a-half) |
 | Aim, then second-finger tap | Right click **without moving** the cursor |
-| Two-finger drag | Scroll (after ~18px travel) |
+| Two-finger drag | Scroll only (cursor stays put, including leftover finger until both lift) |
 
 ## Next work
 
-1. Confirm right-click stays on a folder / icon on iPad.
-2. Confirm two-finger scroll still works.
-3. Confirm window drag, cursor, and freeze fix still good.
+1. Confirm two-finger browser scroll does not move the cursor.
+2. Confirm right-click, window drag, tap, and freeze fix still good.
 
 ## Test rebuild
 

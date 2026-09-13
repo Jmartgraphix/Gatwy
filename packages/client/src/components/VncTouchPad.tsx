@@ -11,9 +11,9 @@ const TWO_FINGER_TAP_MS = 400;
 const HOLD_MS = 350;
 const TAP_AND_A_HALF_MS = 500;
 const MOVE_SLOP = 12;
-const SCROLL_SLOP = 18;
+const SCROLL_SLOP = 14;
 const SENSITIVITY = 1.15;
-const SCROLL_SCALE = 0.6;
+const SCROLL_SCALE = 1.4;
 
 function canvasOf(host: HTMLDivElement | null): HTMLCanvasElement | null {
   return host?.querySelector('canvas') ?? null;
@@ -81,6 +81,8 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     twoFingerMoved: false,
     twoFingerStartAt: 0,
     twoFingerTravel: 0,
+    /** Once two fingers are down, do not move the cursor until all fingers lift. */
+    lockPointer: false,
   });
 
   useEffect(() => {
@@ -166,6 +168,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
         g.moved = false;
         g.twoFingerMoved = false;
         g.twoFingerTravel = 0;
+        g.lockPointer = false;
         g.lastX = t[0].clientX;
         g.lastY = t[0].clientY;
         g.startFingerX = t[0].clientX;
@@ -188,6 +191,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
         g.twoFingerStartAt = Date.now();
         g.twoFingerMoved = false;
         g.twoFingerTravel = 0;
+        g.lockPointer = true;
         g.lastMidX = (t[0].clientX + t[1].clientX) / 2;
         g.lastMidY = (t[0].clientY + t[1].clientY) / 2;
       }
@@ -201,6 +205,12 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       const t = e.touches;
       const g = gesture.current;
       if (t.length === 1) {
+        // After a two-finger scroll/tap, the leftover finger must not fling the cursor.
+        if (g.lockPointer) {
+          g.lastX = t[0].clientX;
+          g.lastY = t[0].clientY;
+          return;
+        }
         const dx = (t[0].clientX - g.lastX) * SENSITIVITY;
         const dy = (t[0].clientY - g.lastY) * SENSITIVITY;
         g.lastX = t[0].clientX;
@@ -237,14 +247,17 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       if (e.touches.length > 0) {
         // Moonlight: 2 → 1 without a scroll is a right-click at the current
         // cursor. Mark the remaining finger so it does not left-click or jump.
-        if (g.fingers >= 2 && e.touches.length === 1 && !g.twoFingerMoved) {
-          const twoDt = Date.now() - (g.twoFingerStartAt || g.startTime);
-          if (canvas && twoDt <= TWO_FINGER_TAP_MS) click(canvas, 2);
+        if (g.fingers >= 2 && e.touches.length === 1) {
+          g.lockPointer = true;
           g.moved = true;
-          g.twoFingerMoved = true;
           g.lastTapAt = 0;
           g.lastX = e.touches[0].clientX;
           g.lastY = e.touches[0].clientY;
+          if (!g.twoFingerMoved) {
+            const twoDt = Date.now() - (g.twoFingerStartAt || g.startTime);
+            if (canvas && twoDt <= TWO_FINGER_TAP_MS) click(canvas, 2);
+            g.twoFingerMoved = true;
+          }
         }
         return;
       }
@@ -252,6 +265,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       if (!canvas) {
         g.fingers = 0;
         g.dragging = false;
+        g.lockPointer = false;
         return;
       }
       if (g.dragging) {
@@ -274,6 +288,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       g.fingers = 0;
       g.twoFingerMoved = false;
       g.twoFingerTravel = 0;
+      g.lockPointer = false;
     };
 
     const block = (e: Event) => {
