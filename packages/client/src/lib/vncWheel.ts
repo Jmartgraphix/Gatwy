@@ -1,8 +1,8 @@
 /** noVNC only emits one VNC wheel notch per event, and only after 50px of delta. */
 export const NOVNC_WHEEL_STEP = 50;
 
-/** Finger pixels → wheel pixels. ~4 notches per 50px of two-finger travel. */
-export const FINGER_TO_WHEEL = 4;
+/** Finger pixels → wheel pixels. ~6 notches per 50px of two-finger travel. */
+export const FINGER_TO_WHEEL = 6;
 
 export type WheelAcc = { x: number; y: number };
 

@@ -152,14 +152,15 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       if (t.length >= 2 && g.dragging && canvas) mouseUp(canvas);
       g.fingers = Math.max(g.fingers, t.length);
       if (t.length === 1) {
+        g.lastX = t[0].clientX;
+        g.lastY = t[0].clientY;
+        // Safari often re-fires a 1-finger start mid two-finger scroll. Keep the
+        // pointer locked so leftover motion cannot fling the cursor to y=0.
+        if (g.lockPointer) return;
         g.startTime = Date.now();
         g.moved = false;
         g.twoFingerMoved = false;
         g.twoFingerTravel = 0;
-        g.lockPointer = false;
-        wheelAcc.current = createWheelAcc();
-        g.lastX = t[0].clientX;
-        g.lastY = t[0].clientY;
         g.startFingerX = t[0].clientX;
         g.startFingerY = t[0].clientY;
         const recentTap = g.lastTapAt > 0 && Date.now() - g.lastTapAt <= TAP_AND_A_HALF_MS;
@@ -169,7 +170,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
           holdTimer = setTimeout(() => {
             holdTimer = null;
             const c = canvasNow();
-            if (c && !gesture.current.moved && !gesture.current.dragging && gesture.current.fingers === 1) {
+            if (c && !gesture.current.moved && !gesture.current.dragging && gesture.current.fingers === 1 && !gesture.current.lockPointer) {
               mouseDown(c);
             }
           }, HOLD_MS);
@@ -177,13 +178,17 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       } else if (t.length >= 2) {
         // Moonlight: second finger never moves the cursor. Aim with one finger,
         // then tap a second finger for right-click on that spot.
-        g.twoFingerStartAt = Date.now();
-        g.twoFingerMoved = false;
-        g.twoFingerTravel = 0;
+        const alreadyScrolling = g.lockPointer && g.twoFingerMoved;
         g.lockPointer = true;
-        wheelAcc.current = createWheelAcc();
+        g.twoFingerStartAt = alreadyScrolling ? g.twoFingerStartAt : Date.now();
+        if (!alreadyScrolling) {
+          g.twoFingerMoved = false;
+          g.twoFingerTravel = 0;
+        }
         g.lastMidX = (t[0].clientX + t[1].clientX) / 2;
         g.lastMidY = (t[0].clientY + t[1].clientY) / 2;
+        g.lastX = g.lastMidX;
+        g.lastY = g.lastMidY;
       }
     };
 
@@ -195,16 +200,22 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       const t = e.touches;
       const g = gesture.current;
       if (t.length === 1) {
-        // After a two-finger scroll/tap, the leftover finger must not fling the cursor.
-        if (g.lockPointer) {
-          g.lastX = t[0].clientX;
-          g.lastY = t[0].clientY;
-          return;
-        }
-        const dx = (t[0].clientX - g.lastX) * SENSITIVITY;
-        const dy = (t[0].clientY - g.lastY) * SENSITIVITY;
+        const dx = t[0].clientX - g.lastX;
+        const dy = t[0].clientY - g.lastY;
         g.lastX = t[0].clientX;
         g.lastY = t[0].clientY;
+        // Leftover finger during a two-finger scroll: keep scrolling, never move cursor.
+        if (g.lockPointer) {
+          if (g.twoFingerMoved) {
+            // Cap a leftover-finger sample so a 2→1 handoff cannot dump a huge delta.
+            const max = 80;
+            const cdx = Math.max(-max, Math.min(max, dx));
+            const cdy = Math.max(-max, Math.min(max, dy));
+            const c = clientOf(canvas, pos.current.x, pos.current.y);
+            feedWheel(canvas, c.x, c.y, cdx, cdy, wheelAcc.current);
+          }
+          return;
+        }
         const dist = Math.hypot(t[0].clientX - g.startFingerX, t[0].clientY - g.startFingerY);
         // Deadzone so planting a second finger does not nudge off a folder.
         if (!g.dragging && dist <= MOVE_SLOP) return;
@@ -212,7 +223,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
           g.moved = true;
           if (!g.dragging) clearHold();
         }
-        pos.current = clamp(canvas, pos.current.x + dx, pos.current.y + dy);
+        pos.current = clamp(canvas, pos.current.x + dx * SENSITIVITY, pos.current.y + dy * SENSITIVITY);
         sendMove(canvas, g.dragging ? 1 : 0);
       } else if (t.length >= 2) {
         const midX = (t[0].clientX + t[1].clientX) / 2;
