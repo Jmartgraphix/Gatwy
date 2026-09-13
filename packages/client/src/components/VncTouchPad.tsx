@@ -7,9 +7,11 @@ interface VncTouchPadProps {
 }
 
 const TAP_MS = 280;
+const TWO_FINGER_TAP_MS = 400;
 const HOLD_MS = 350;
 const TAP_AND_A_HALF_MS = 500;
 const MOVE_SLOP = 12;
+const SCROLL_SLOP = 18;
 const SENSITIVITY = 1.15;
 const SCROLL_SCALE = 0.6;
 
@@ -58,7 +60,8 @@ function clientOf(canvas: HTMLCanvasElement, x: number, y: number): { x: number;
 /**
  * Moonlight-style trackpad overlay (no extra cursor — the remote pointer is the cursor).
  * One-finger drag moves. Tap = left click. Long-press then drag, or tap then drag,
- * holds left button to move windows. Two-finger tap = right-click. Two-finger drag scrolls.
+ * holds left button to move windows. Two-finger tap = right-click at the current
+ * cursor (Moonlight: do not move the pointer). Two-finger drag scrolls.
  */
 export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -75,6 +78,9 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     startFingerX: 0,
     startFingerY: 0,
     lastTapAt: 0,
+    twoFingerMoved: false,
+    twoFingerStartAt: 0,
+    twoFingerTravel: 0,
   });
 
   useEffect(() => {
@@ -155,9 +161,11 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       clearHold();
       if (t.length >= 2 && g.dragging && canvas) mouseUp(canvas);
       g.fingers = Math.max(g.fingers, t.length);
-      g.startTime = Date.now();
-      g.moved = false;
       if (t.length === 1) {
+        g.startTime = Date.now();
+        g.moved = false;
+        g.twoFingerMoved = false;
+        g.twoFingerTravel = 0;
         g.lastX = t[0].clientX;
         g.lastY = t[0].clientY;
         g.startFingerX = t[0].clientX;
@@ -175,6 +183,11 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
           }, HOLD_MS);
         }
       } else if (t.length >= 2) {
+        // Moonlight: second finger never moves the cursor. Aim with one finger,
+        // then tap a second finger for right-click on that spot.
+        g.twoFingerStartAt = Date.now();
+        g.twoFingerMoved = false;
+        g.twoFingerTravel = 0;
         g.lastMidX = (t[0].clientX + t[1].clientX) / 2;
         g.lastMidY = (t[0].clientY + t[1].clientY) / 2;
       }
@@ -192,7 +205,10 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
         const dy = (t[0].clientY - g.lastY) * SENSITIVITY;
         g.lastX = t[0].clientX;
         g.lastY = t[0].clientY;
-        if (Math.hypot(t[0].clientX - g.startFingerX, t[0].clientY - g.startFingerY) > MOVE_SLOP) {
+        const dist = Math.hypot(t[0].clientX - g.startFingerX, t[0].clientY - g.startFingerY);
+        // Deadzone so planting a second finger does not nudge off a folder.
+        if (!g.dragging && dist <= MOVE_SLOP) return;
+        if (dist > MOVE_SLOP) {
           g.moved = true;
           if (!g.dragging) clearHold();
         }
@@ -205,7 +221,9 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
         const dy = midY - g.lastMidY;
         g.lastMidX = midX;
         g.lastMidY = midY;
-        if (Math.hypot(dx, dy) > 1) g.moved = true;
+        g.twoFingerTravel += Math.hypot(dx, dy);
+        if (g.twoFingerTravel > SCROLL_SLOP) g.twoFingerMoved = true;
+        if (!g.twoFingerMoved) return;
         const c = clientOf(canvas, pos.current.x, pos.current.y);
         fireWheel(canvas, c.x, c.y, -dx * SCROLL_SCALE, -dy * SCROLL_SCALE);
       }
@@ -214,10 +232,23 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     const onEnd = (e: TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (e.touches.length > 0) return;
-      clearHold();
       const canvas = canvasNow();
       const g = gesture.current;
+      if (e.touches.length > 0) {
+        // Moonlight: 2 → 1 without a scroll is a right-click at the current
+        // cursor. Mark the remaining finger so it does not left-click or jump.
+        if (g.fingers >= 2 && e.touches.length === 1 && !g.twoFingerMoved) {
+          const twoDt = Date.now() - (g.twoFingerStartAt || g.startTime);
+          if (canvas && twoDt <= TWO_FINGER_TAP_MS) click(canvas, 2);
+          g.moved = true;
+          g.twoFingerMoved = true;
+          g.lastTapAt = 0;
+          g.lastX = e.touches[0].clientX;
+          g.lastY = e.touches[0].clientY;
+        }
+        return;
+      }
+      clearHold();
       if (!canvas) {
         g.fingers = 0;
         g.dragging = false;
@@ -226,17 +257,23 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       if (g.dragging) {
         mouseUp(canvas);
         g.lastTapAt = 0;
+      } else if (g.fingers >= 2) {
+        const twoDt = Date.now() - (g.twoFingerStartAt || g.startTime);
+        if (!g.twoFingerMoved && twoDt <= TWO_FINGER_TAP_MS) click(canvas, 2);
+        g.lastTapAt = 0;
       } else {
         const dt = Date.now() - g.startTime;
         const tap = !g.moved && dt <= TAP_MS;
         if (tap) {
-          click(canvas, g.fingers >= 2 ? 2 : 0);
-          g.lastTapAt = g.fingers >= 2 ? 0 : Date.now();
+          click(canvas, 0);
+          g.lastTapAt = Date.now();
         } else {
           g.lastTapAt = 0;
         }
       }
       g.fingers = 0;
+      g.twoFingerMoved = false;
+      g.twoFingerTravel = 0;
     };
 
     const block = (e: Event) => {

@@ -8,14 +8,16 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 **Freeze fix (confirmed):** `a7182a3` — each tap is one left click; `window` `mouseup` after click so noVNC `setCapture()` releases. Do **not** remove `#noVNC_mouse_capture_elem`.
 
-**Window-drag attempt:** long-press then drag, or tap then drag (tap-and-a-half), holds the left button while the finger moves. Still uses canvas `MouseEvent`s only.
+**Window drag (confirmed):** `602f829` — long-press then drag, or tap then drag, holds left button.
+
+**Right-click polish (in test):** Moonlight-style two-finger tap. Aim with one finger, plant a second finger. Do **not** move the remote cursor for the second finger. Small one-finger deadzone so planting the second finger does not slide off a folder.
 
 Keep:
 
 - Extra overlay cursor gone
 - Remote VNC cursor visible and usable
-- Drag (cursor move) / tap / two-finger tap / two-finger scroll
-- Double-tap does not freeze
+- One-finger move / tap / hold-drag / freeze-free double-tap
+- Two-finger scroll after a real two-finger drag
 
 Do not reintroduce:
 
@@ -30,22 +32,18 @@ Do not reintroduce:
 - [x] Touchscreen vs Touchpad toggle in the VNC sidebar while a session is running
 - [x] Touchpad: one-finger drag moves the remote pointer
 - [x] Touchpad: tap = left click
-- [x] Touchpad: two-finger tap = right click
 - [x] Touchpad: two-finger drag = scroll
 - [x] Extra overlay cursor removed (only the remote VNC cursor)
 - [x] Cursor visible and usable after extra-cursor removal (`f853b55` / `b349aad`)
 - [x] Double-tap on iPad does not freeze (`a7182a3`)
 - [x] Double-tap = left click, cursor still visible (`a7182a3`)
+- [x] Touchpad: drag a Steam Deck / KDE window (`602f829`)
 
 ### In test
 
-- [ ] Touchpad: drag a Steam Deck / KDE window (title bar)
-  - Press-and-hold (~350ms) then drag, **or**
-  - Tap (click the title bar) then immediately drag
-
-### Not done
-
-- [ ] Right-click gesture polish (two-finger tap still sends right click)
+- [ ] Right-click: aim with one finger, tap a second finger, cursor stays on the folder
+- [ ] Two-finger tap does not nudge the pointer
+- [ ] Two-finger drag still scrolls (after leaving the two-finger deadzone)
 
 ## What we already learned
 
@@ -56,26 +54,37 @@ Do not reintroduce:
 | Drive RFB private methods instead of DOM events (`6b83433`) | Cursor gone. Clicks unreliable. Built JS names do not match source internals. |
 | Draw a local cursor again + strip capture overlay (`1c345d1`, `29fb141`) | Cursor missing, or only flashes after long-press drag, then vanishes. |
 | Extra click on second tap (`f853b55` double-click path) | Freeze; a later single tap unfreezes (matches stuck `setCapture()`). |
-| Window `mouseup` after each canvas click (`a7182a3`) | **Freeze gone.** Cursor still visible. One-finger move still only moves the pointer, so GUI windows cannot be dragged. |
-| Long-press then drag / tap then drag (this change) | TBD on iPad. |
+| Window `mouseup` after each canvas click (`a7182a3`) | **Freeze gone.** Cursor still visible. |
+| Long-press then drag / tap then drag (`602f829`) | **Window drag works.** |
+| Two-finger tap moved the cursor (midpoint / first-finger jitter) | Right-click missed the folder. Moonlight iOS `RelativeTouchHandler` only moves on finger 1; two-finger tap clicks **where the cursor already is**. |
+
+## Moonlight (iOS relative / trackpad) — what we copied
+
+From `moonlight-ios` `RelativeTouchHandler.m` and `moonlight-qt` `reltouch.cpp`:
+
+- Only the **primary finger** moves the mouse.
+- Two-finger tap = right-click at the **current** pointer. Second finger does not aim.
+- Tiny move deadzone (~5px) so a tap is not a drag.
+- Going 2 fingers → 1 marks the remaining finger as moved so it does not left-click.
+- Two-finger **drag** (after leaving the deadzone) is scroll, not a tap.
 
 ## Gestures (touchpad)
 
 | Gesture | Action |
 | --- | --- |
-| One-finger move | Move remote cursor (button up) |
+| One-finger move | Move remote cursor (button up). Small deadzone so a tap does not nudge. |
 | Tap | Left click |
 | Double-tap | Two left clicks (not a freeze) |
 | Long-press (~350ms) then drag | Left button down, drag windows, up on lift |
 | Tap, then immediately drag | Same window-drag (tap-and-a-half) |
-| Two-finger tap | Right click |
-| Two-finger drag | Scroll |
+| Aim, then second-finger tap | Right click **without moving** the cursor |
+| Two-finger drag | Scroll (after ~18px travel) |
 
 ## Next work
 
-1. Confirm window drag on Steam Deck desktop from iPad.
-2. Confirm cursor, tap, and freeze fix still good.
-3. Then polish right-click if needed.
+1. Confirm right-click stays on a folder / icon on iPad.
+2. Confirm two-finger scroll still works.
+3. Confirm window drag, cursor, and freeze fix still good.
 
 ## Test rebuild
 
@@ -85,4 +94,4 @@ docker compose build --no-cache --pull
 docker compose up -d --force-recreate
 ```
 
-Hard-refresh the iPad. Try moving a window: tap the title bar, then drag; or hold on the title bar until the hold, then drag.
+Hard-refresh the iPad. Put the cursor on a folder, tap a second finger, lift. The menu should open on that folder.
