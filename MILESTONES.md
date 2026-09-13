@@ -16,7 +16,9 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 **Scroll speed:** `ff4c729` helped touchscreen more than touchpad. Touchpad still lost the leftover finger to cursor-move, which jumped the pointer to the top of the screen.
 
-**Touchpad leftover-finger (in test):** Keep two-finger (and leftover one-finger) motion as wheel only until **all** fingers lift. Do not reset the lock if Safari re-fires a 1-finger `touchstart` mid-scroll. Match speed (`FINGER_TO_WHEEL` 6).
+**Touchpad leftover-finger (confirmed):** `20405fd` — leftover finger stays in scroll; cursor no longer jumps to the top.
+
+**Desktop vs touch UI (in test):** Show Touchscreen / Touchpad only when `(pointer: coarse)`. Desktop never mounts overlays (so a saved iPad “touchpad” preference cannot cover the mouse). Phones and tablets keep the toggle. Same check as the mobile keyboard FAB. Do **not** use `maxTouchPoints`.
 
 Keep:
 
@@ -45,12 +47,13 @@ Do not reintroduce:
 - [x] Double-tap = left click, cursor still visible (`a7182a3`)
 - [x] Touchpad: drag a Steam Deck / KDE window (`602f829`)
 - [x] Right-click: aim with one finger, tap a second finger, cursor stays on the folder (`a834729`)
+- [x] Touchpad two-finger scroll does not jump the cursor to the top (`20405fd`)
 
 ### In test
 
-- [ ] Touchpad two-finger scroll does not jump the cursor to the top of the screen
-- [ ] Touchpad scroll speed closer to touchscreen
-- [ ] One-finger cursor move still works after lifting both fingers
+- [ ] Desktop sidebar has no Touch section; mouse still works
+- [ ] iPad / phone / tablet still show Touchscreen / Touchpad
+- [ ] Saved touchpad mode on iPad does not overlay a later desktop session
 
 ## What we already learned
 
@@ -67,7 +70,8 @@ Do not reintroduce:
 | Two-finger scroll (`a834729`) | Page scrolled slowly **and** the leftover finger moved the cursor off-screen (Safari often reports 1 touch mid-scroll). |
 | Cursor lock (`33644d7`) | Wander reduced. Still slow: noVNC `WHEEL_STEP` is 50px and leftover delta is thrown away. |
 | Extra wheel notches + touchscreen intercept (`ff4c729`) | Touchscreen faster. Touchpad still slower; leftover finger jumped cursor to top of screen. |
-| Leftover-finger stays in scroll / ignore 1-finger start while locked (this change) | TBD. |
+| Leftover-finger stays in scroll / ignore 1-finger start while locked (`20405fd`) | **Cursor stays put.** Scroll usable. |
+| Hide Touch UI unless `(pointer: coarse)` (this change) | TBD. |
 
 ## Moonlight (iOS relative / trackpad) — what we copied
 
@@ -93,9 +97,9 @@ From `moonlight-ios` `RelativeTouchHandler.m` and `moonlight-qt` `reltouch.cpp`:
 
 ## Next work
 
-1. Confirm touchpad scroll does not jump the cursor to the top.
-2. Confirm touchpad scroll speed is closer to touchscreen.
-3. Confirm right-click, window drag, tap, and freeze fix still good.
+1. Confirm a desktop browser has no Touch block and the mouse works.
+2. Confirm iPad still has Touchscreen / Touchpad and gestures.
+3. Optional: Android phone still shows Touch.
 
 ## Test rebuild
 

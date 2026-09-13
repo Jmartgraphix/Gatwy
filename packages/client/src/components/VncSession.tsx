@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { getWsTicket } from '../lib/wsTicket';
 import { DisconnectOverlay } from './DisconnectOverlay';
@@ -7,7 +7,7 @@ import { VncMobileKeyboard } from './VncMobileKeyboard';
 import { VncTouchPad } from './VncTouchPad';
 import { VncTwoFingerScroll } from './VncTwoFingerScroll';
 import { applyVncPointerMap } from '../lib/vncPointerMap';
-import { loadVncTouchMode, saveVncTouchMode, type VncTouchMode } from '../lib/vncTouchMode';
+import { isCoarsePointer, loadVncTouchMode, saveVncTouchMode, type VncTouchMode } from '../lib/vncTouchMode';
 
 interface VncSessionProps {
   connectionId: string;
@@ -25,7 +25,8 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   const [reconnectCount, setReconnectCount] = useState(0);
-  const [touchMode, setTouchMode] = useState<VncTouchMode>(() => loadVncTouchMode());
+  const isTouch = useMemo(() => isCoarsePointer(), []);
+  const [touchMode, setTouchMode] = useState<VncTouchMode>(() => (isCoarsePointer() ? loadVncTouchMode() : 'touchscreen'));
 
   function setAndNotify(s: 'connecting' | 'connected' | 'disconnected') {
     setStatus(s);
@@ -228,11 +229,11 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
       <div className="flex flex-row flex-1 overflow-hidden relative">
         <div
           className="flex-1 overflow-hidden relative"
-          style={{ background: '#000', touchAction: touchMode === 'touchpad' ? 'none' : undefined }}
+          style={{ background: '#000', touchAction: isTouch && touchMode === 'touchpad' ? 'none' : undefined }}
         >
           <div ref={containerRef} className="absolute inset-0" />
-          <VncTouchPad hostRef={containerRef} enabled={status === 'connected' && touchMode === 'touchpad'} />
-          <VncTwoFingerScroll hostRef={containerRef} enabled={status === 'connected' && touchMode === 'touchscreen'} />
+          <VncTouchPad hostRef={containerRef} enabled={isTouch && status === 'connected' && touchMode === 'touchpad'} />
+          <VncTwoFingerScroll hostRef={containerRef} enabled={isTouch && status === 'connected' && touchMode === 'touchscreen'} />
         </div>
         <VncControlPanel
           rfbRef={rfbRef}
@@ -241,6 +242,7 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
           onDisconnect={handleDisconnect}
           touchMode={touchMode}
           onTouchModeChange={handleTouchModeChange}
+          showTouch={isTouch}
         />
         <VncMobileKeyboard rfbRef={rfbRef} status={status} />
       </div>

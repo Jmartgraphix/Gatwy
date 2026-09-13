@@ -10,6 +10,8 @@ interface VncControlPanelProps {
   onDisconnect: () => void;
   touchMode: 'touchscreen' | 'touchpad';
   onTouchModeChange: (mode: 'touchscreen' | 'touchpad') => void;
+  /** Finger-primary devices only. Desktop never mounts the touch overlays. */
+  showTouch?: boolean;
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -204,7 +206,7 @@ function ClipboardArea({ rfbRef, disabled }: { rfbRef: RefObject<RFBInstance | n
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function VncControlPanel({ rfbRef, status, sessionRef, onDisconnect, touchMode, onTouchModeChange }: VncControlPanelProps) {
+export function VncControlPanel({ rfbRef, status, sessionRef, onDisconnect, touchMode, onTouchModeChange, showTouch = false }: VncControlPanelProps) {
   const [open, setOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -341,6 +343,7 @@ export function VncControlPanel({ rfbRef, status, sessionRef, onDisconnect, touc
             <div className="border-t border-border" />
 
             <Section title="Input">
+              {showTouch && (
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs text-text-primary">Touch</span>
                 <div className="flex rounded-md border border-border overflow-hidden">
@@ -373,6 +376,7 @@ export function VncControlPanel({ rfbRef, status, sessionRef, onDisconnect, touc
                     : 'Tap the picture where you want to click, like a real touchscreen.'}
                 </p>
               </div>
+              )}
               <Toggle label="View only" checked={viewOnly} onChange={setViewOnlyMode} disabled={!connected} />
               <button
                 onClick={handleCtrlAltDel}
