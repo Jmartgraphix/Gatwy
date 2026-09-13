@@ -5,6 +5,7 @@ import { DisconnectOverlay } from './DisconnectOverlay';
 import { VncControlPanel } from './VncControlPanel';
 import { VncMobileKeyboard } from './VncMobileKeyboard';
 import { VncTouchPad } from './VncTouchPad';
+import { VncTwoFingerScroll } from './VncTwoFingerScroll';
 import { applyVncPointerMap } from '../lib/vncPointerMap';
 import { loadVncTouchMode, saveVncTouchMode, type VncTouchMode } from '../lib/vncTouchMode';
 
@@ -231,6 +232,7 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
         >
           <div ref={containerRef} className="absolute inset-0" />
           <VncTouchPad hostRef={containerRef} enabled={status === 'connected' && touchMode === 'touchpad'} />
+          <VncTwoFingerScroll hostRef={containerRef} enabled={status === 'connected' && touchMode === 'touchscreen'} />
         </div>
         <VncControlPanel
           rfbRef={rfbRef}

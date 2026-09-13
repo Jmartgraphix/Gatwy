@@ -12,7 +12,9 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 **Right-click polish (confirmed by user):** `a834729` — Moonlight-style two-finger tap. Aim with one finger, plant a second finger. Do **not** move the remote cursor for the second finger.
 
-**Two-finger scroll (in test):** Lock the remote pointer for the whole two-finger gesture, including when Safari reports 1 leftover finger. Two-finger motion is wheel only. Slightly stronger wheel scale so browser pages scroll without dragging the cursor off-screen.
+**Two-finger scroll:** `33644d7` locked the cursor (better, still a little wander on leftover finger). Speed was slow in **both** modes because noVNC only emits one wheel notch per `wheel` event and only after 50px of delta — leftover pixels are discarded.
+
+**Scroll speed (in test):** Shared `vncWheel` helper: ~4 notches per 50px of two-finger travel. Touchpad still locks the cursor. Touchscreen intercepts two-finger gestures so noVNC does not move the pointer while scrolling.
 
 Keep:
 
@@ -44,9 +46,10 @@ Do not reintroduce:
 
 ### In test
 
-- [ ] Two-finger scroll on a browser page does not fling the cursor off-screen
-- [ ] Two-finger scroll still moves the page
-- [ ] One-finger cursor move still works after lifting both fingers
+- [ ] Browser two-finger scroll is faster (touchscreen and touchpad)
+- [ ] Touchpad scroll does not wander the cursor
+- [ ] Touchscreen two-finger scroll does not wander the cursor
+- [ ] One-finger cursor / tap still work in both modes
 
 ## What we already learned
 
@@ -61,6 +64,8 @@ Do not reintroduce:
 | Long-press then drag / tap then drag (`602f829`) | **Window drag works.** |
 | Two-finger tap moved the cursor (midpoint / first-finger jitter) | Right-click missed the folder. Moonlight iOS `RelativeTouchHandler` only moves on finger 1; two-finger tap clicks **where the cursor already is**. |
 | Two-finger scroll (`a834729`) | Page scrolled slowly **and** the leftover finger moved the cursor off-screen (Safari often reports 1 touch mid-scroll). |
+| Cursor lock (`33644d7`) | Wander reduced. Still slow: noVNC `WHEEL_STEP` is 50px and leftover delta is thrown away. |
+| Extra wheel notches + touchscreen intercept (this change) | TBD. |
 
 ## Moonlight (iOS relative / trackpad) — what we copied
 
@@ -86,8 +91,9 @@ From `moonlight-ios` `RelativeTouchHandler.m` and `moonlight-qt` `reltouch.cpp`:
 
 ## Next work
 
-1. Confirm two-finger browser scroll does not move the cursor.
-2. Confirm right-click, window drag, tap, and freeze fix still good.
+1. Confirm browser two-finger scroll feels faster in both modes.
+2. Confirm the cursor stays put while scrolling.
+3. Confirm right-click, window drag, tap, and freeze fix still good.
 
 ## Test rebuild
 

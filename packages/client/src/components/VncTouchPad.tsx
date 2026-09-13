@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
+import { createWheelAcc, feedWheel } from '../lib/vncWheel';
 
 interface VncTouchPadProps {
   /** noVNC host div that contains the canvas */
@@ -13,7 +14,6 @@ const TAP_AND_A_HALF_MS = 500;
 const MOVE_SLOP = 12;
 const SCROLL_SLOP = 14;
 const SENSITIVITY = 1.15;
-const SCROLL_SCALE = 1.4;
 
 function canvasOf(host: HTMLDivElement | null): HTMLCanvasElement | null {
   return host?.querySelector('canvas') ?? null;
@@ -36,19 +36,6 @@ function fireMouse(
     buttons,
     button,
     detail: type === 'mouseup' || type === 'mousedown' ? 1 : 0,
-  }));
-}
-
-function fireWheel(canvas: HTMLCanvasElement, clientX: number, clientY: number, deltaX: number, deltaY: number): void {
-  canvas.dispatchEvent(new WheelEvent('wheel', {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    clientX,
-    clientY,
-    deltaX,
-    deltaY,
-    deltaMode: 0,
   }));
 }
 
@@ -84,6 +71,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     /** Once two fingers are down, do not move the cursor until all fingers lift. */
     lockPointer: false,
   });
+  const wheelAcc = useRef(createWheelAcc());
 
   useEffect(() => {
     if (!enabled) return;
@@ -169,6 +157,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
         g.twoFingerMoved = false;
         g.twoFingerTravel = 0;
         g.lockPointer = false;
+        wheelAcc.current = createWheelAcc();
         g.lastX = t[0].clientX;
         g.lastY = t[0].clientY;
         g.startFingerX = t[0].clientX;
@@ -192,6 +181,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
         g.twoFingerMoved = false;
         g.twoFingerTravel = 0;
         g.lockPointer = true;
+        wheelAcc.current = createWheelAcc();
         g.lastMidX = (t[0].clientX + t[1].clientX) / 2;
         g.lastMidY = (t[0].clientY + t[1].clientY) / 2;
       }
@@ -235,7 +225,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
         if (g.twoFingerTravel > SCROLL_SLOP) g.twoFingerMoved = true;
         if (!g.twoFingerMoved) return;
         const c = clientOf(canvas, pos.current.x, pos.current.y);
-        fireWheel(canvas, c.x, c.y, -dx * SCROLL_SCALE, -dy * SCROLL_SCALE);
+        feedWheel(canvas, c.x, c.y, dx, dy, wheelAcc.current);
       }
     };
 
@@ -289,6 +279,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       g.twoFingerMoved = false;
       g.twoFingerTravel = 0;
       g.lockPointer = false;
+      wheelAcc.current = createWheelAcc();
     };
 
     const block = (e: Event) => {
