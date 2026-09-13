@@ -4,7 +4,9 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 ## Current baseline
 
-**Commit to test from:** `f853b55` (`fix(vnc): restore VncSession.tsx emptied in last touchpad commit`)
+**Last known-good cursor:** `f853b55` / `b349aad` (remote cursor visible, no extra overlay pointer).
+
+**Current freeze attempt:** `feat/vnc-touch-mode` after `b349aad` — keep the working mouse-event path. Each tap is one left click (no extra click on the second tap). After click, dispatch `window` `mouseup` so noVNC `setCapture()` releases. Do **not** remove `#noVNC_mouse_capture_elem`.
 
 That is the last build where:
 
@@ -32,8 +34,9 @@ Later freeze-fix commits (`6b83433`, `1c345d1`, `29fb141`) broke the cursor (mis
 
 ### Not done / broken
 
-- [ ] Double-tap on a web link does not freeze the session
-- [ ] Double-tap should send a real double-click without losing the cursor
+- [ ] Double-tap on iPad does not freeze the session (in test)
+- [ ] Double-tap = left click, cursor still visible (in test)
+- [ ] Right-click gesture (two-finger tap still sends right click; revisit after freeze is gone)
 
 ## What we already learned
 
@@ -43,12 +46,14 @@ Later freeze-fix commits (`6b83433`, `1c345d1`, `29fb141`) broke the cursor (mis
 | Remove overlay cursor, send canvas `MouseEvent`s (`64df2e9` / `f853b55`) | **Cursor works.** Double-tap on a link still freezes. |
 | Drive RFB private methods instead of DOM events (`6b83433`) | Cursor gone. Clicks unreliable. Built JS names do not match source internals. |
 | Draw a local cursor again + strip capture overlay (`1c345d1`, `29fb141`) | Cursor missing, or only flashes after long-press drag, then vanishes. |
+| Extra click on second tap (`f853b55` double-click path) | Freeze; a later single tap unfreezes (matches stuck `setCapture()`). |
+| Window `mouseup` after each canvas click (this change) | TBD on iPad. |
 
-## Next work (after this baseline is confirmed)
+## Next work
 
-1. Confirm iPad still has a visible, draggable remote cursor on `f853b55` behavior.
-2. Only then fix the freeze. Likely Safari double-tap-zoom / noVNC `setCapture()` overlay after a second tap.
-3. Keep the working cursor path. Do not hide noVNC’s cursor and do not add a second pointer.
+1. Confirm cursor still visible after this freeze-only change.
+2. Confirm double-tap is a left click and does not freeze.
+3. Then decide right-click (two-finger tap is still wired).
 
 ## Test rebuild
 

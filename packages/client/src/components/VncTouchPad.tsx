@@ -7,7 +7,6 @@ interface VncTouchPadProps {
 }
 
 const TAP_MS = 280;
-const DOUBLE_TAP_MS = 350;
 const SENSITIVITY = 1.15;
 const SCROLL_SCALE = 0.6;
 
@@ -55,7 +54,7 @@ function clientOf(canvas: HTMLCanvasElement, x: number, y: number): { x: number;
 
 /**
  * Moonlight-style trackpad overlay (no extra cursor — the remote pointer is the cursor).
- * One-finger drag moves. Tap = click. Two taps = double-click. Two-finger tap = right-click.
+ * One-finger drag moves. Tap or double-tap = left click. Two-finger tap = right-click.
  * Two-finger drag scrolls.
  */
 export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
@@ -69,7 +68,6 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     lastY: 0,
     lastMidX: 0,
     lastMidY: 0,
-    lastTapAt: 0,
   });
 
   useEffect(() => {
@@ -87,12 +85,27 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       };
     };
 
+    const releaseCapture = (clientX: number, clientY: number, button = 0) => {
+      // noVNC setCapture() only drops the overlay on a window mouseup.
+      // Do not remove #noVNC_mouse_capture_elem — that hid the remote cursor.
+      window.dispatchEvent(new MouseEvent('mouseup', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        clientX,
+        clientY,
+        buttons: 0,
+        button,
+      }));
+    };
+
     const click = (canvas: HTMLCanvasElement, button: 0 | 2) => {
       const c = clientOf(canvas, pos.current.x, pos.current.y);
       const buttons = button === 0 ? 1 : 2;
       fireMouse(canvas, 'mousemove', c.x, c.y, 0);
       fireMouse(canvas, 'mousedown', c.x, c.y, buttons, button);
       fireMouse(canvas, 'mouseup', c.x, c.y, 0, button);
+      releaseCapture(c.x, c.y, button);
     };
 
     const onStart = (e: TouchEvent) => {
@@ -153,24 +166,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       }
       const dt = Date.now() - g.startTime;
       const tap = !g.moved && dt <= TAP_MS;
-      if (tap) {
-        if (g.fingers >= 2) {
-          click(canvas, 2);
-          g.lastTapAt = 0;
-        } else {
-          const now = Date.now();
-          const dbl = g.lastTapAt > 0 && now - g.lastTapAt <= DOUBLE_TAP_MS;
-          click(canvas, 0);
-          if (dbl) {
-            click(canvas, 0);
-            g.lastTapAt = 0;
-          } else {
-            g.lastTapAt = now;
-          }
-        }
-      } else {
-        g.lastTapAt = 0;
-      }
+      if (tap) click(canvas, g.fingers >= 2 ? 2 : 0);
       g.fingers = 0;
     };
 
@@ -185,7 +181,9 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     overlay.addEventListener('touchcancel', onEnd, opts);
     overlay.addEventListener('gesturestart', block, opts);
     overlay.addEventListener('gesturechange', block, opts);
+    overlay.addEventListener('gestureend', block, opts);
     overlay.addEventListener('dblclick', block, opts);
+    overlay.addEventListener('click', block, opts);
 
     const canvas = canvasNow();
     if (canvas) {
@@ -200,7 +198,9 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       overlay.removeEventListener('touchcancel', onEnd, opts);
       overlay.removeEventListener('gesturestart', block, opts);
       overlay.removeEventListener('gesturechange', block, opts);
+      overlay.removeEventListener('gestureend', block, opts);
       overlay.removeEventListener('dblclick', block, opts);
+      overlay.removeEventListener('click', block, opts);
     };
   }, [enabled, hostRef]);
 
