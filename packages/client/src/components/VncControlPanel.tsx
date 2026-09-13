@@ -369,7 +369,7 @@ export function VncControlPanel({ rfbRef, status, sessionRef, onDisconnect, touc
                 </div>
                 <p className="text-[11px] text-text-secondary leading-tight">
                   {touchMode === 'touchpad'
-                    ? 'Move the cursor like a laptop trackpad. Tap to click, two-finger tap for right-click, two-finger drag to scroll.'
+                    ? 'Move like a laptop trackpad. Tap to click. Press-and-hold then drag, or tap then drag, to move windows. Two-finger tap is right-click, two-finger drag scrolls.'
                     : 'Tap the picture where you want to click, like a real touchscreen.'}
                 </p>
               </div>
