@@ -1,54 +1,69 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
-type RfbPointer = {
-  _handleMouseMove?: (x: number, y: number) => void;
-  _handleMouseButton?: (x: number, y: number, bmask: number) => void;
-  _mouseButtonMask?: number;
-};
-
 interface VncTouchPadProps {
-  /** noVNC host div that contains the canvas */
   hostRef: RefObject<HTMLDivElement | null>;
   rfbRef: RefObject<object | null>;
   enabled: boolean;
 }
 
 const TAP_MS = 280;
+const DOUBLE_TAP_MS = 350;
 const SENSITIVITY = 1.15;
-const SCROLL_SCALE = 0.6;
-const BUTTON_HOLD_MS = 35;
-const LEFT = 0x1;
-const RIGHT = 0x4;
-const WHEEL_UP = 1 << 3;
-const WHEEL_DOWN = 1 << 4;
-const WHEEL_LEFT = 1 << 5;
-const WHEEL_RIGHT = 1 << 6;
-const WHEEL_STEP = 16;
+const SCROLL_SCALE = 0.55;
 
 function canvasOf(host: HTMLDivElement | null): HTMLCanvasElement | null {
   return host?.querySelector('canvas') ?? null;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function hideNovncJunk(): void {
+  document.getElementById('noVNC_mouse_capture_elem')?.remove();
+  const cap = document.querySelector('[id*="noVNC_mouse_capture"]');
+  if (cap instanceof HTMLElement) cap.remove();
 }
 
-function hideNovncCapture(): void {
-  const el = document.getElementById('noVNC_mouse_capture_elem');
-  if (el) el.style.display = 'none';
+function fireMouse(
+  canvas: HTMLCanvasElement,
+  type: 'mousemove' | 'mousedown' | 'mouseup',
+  clientX: number,
+  clientY: number,
+  buttons: number,
+  button = 0,
+  detail = 1,
+): void {
+  canvas.dispatchEvent(new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    clientX,
+    clientY,
+    buttons,
+    button,
+    detail,
+  }));
+}
+
+function fireWheel(canvas: HTMLCanvasElement, clientX: number, clientY: number, deltaX: number, deltaY: number): void {
+  canvas.dispatchEvent(new WheelEvent('wheel', {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    clientX,
+    clientY,
+    deltaX,
+    deltaY,
+    deltaMode: 0,
+  }));
 }
 
 /**
- * Moonlight-style trackpad overlay (no extra cursor — the remote pointer is the cursor).
- * One-finger drag moves. Tap = click. Two taps = double-click. Two-finger tap = right-click.
- * Two-finger drag scrolls.
- *
- * Pointer events go through noVNC's RFB methods so we never synthesize DOM mouse
- * events (those call setCapture() and leave a full-screen overlay on iOS after a
- * double-tap, which freezes the cursor).
+ * Moonlight-style trackpad. One local cursor on the overlay (the remote
+ * sprite is hidden so there is not a second pointer). Finger drag moves it.
+ * Tap = click, double-tap = double-click, two-finger tap = right-click,
+ * two-finger drag = scroll.
  */
-export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
+export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
   const pos = useRef({ x: 0, y: 0 });
   const gesture = useRef({
     fingers: 0,
@@ -58,10 +73,8 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
     lastY: 0,
     lastMidX: 0,
     lastMidY: 0,
-    wheelX: 0,
-    wheelY: 0,
+    lastTapAt: 0,
   });
-  const queue = useRef(Promise.resolve());
 
   useEffect(() => {
     if (!enabled) return;
@@ -69,7 +82,12 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
     if (!overlay) return;
 
     const canvasNow = () => canvasOf(hostRef.current);
-    const rfb = () => rfbRef.current as RfbPointer | null;
+
+    const placeCursor = (x: number, y: number) => {
+      const el = cursorRef.current;
+      if (!el) return;
+      el.style.transform = `translate(${x}px, ${y}px)`;
+    };
 
     const clamp = (canvas: HTMLCanvasElement, x: number, y: number) => {
       const r = canvas.getBoundingClientRect();
@@ -79,34 +97,24 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
       };
     };
 
-    const move = (x: number, y: number) => {
-      rfb()?._handleMouseMove?.(x, y);
+    const client = (canvas: HTMLCanvasElement) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: r.left + pos.current.x, y: r.top + pos.current.y };
     };
 
-    const button = (mask: number) => {
-      const inst = rfb();
-      if (!inst?._handleMouseButton) return;
-      inst._handleMouseButton(pos.current.x, pos.current.y, mask);
-      inst._mouseButtonMask = mask;
+    const moveRemote = (canvas: HTMLCanvasElement) => {
+      const c = client(canvas);
+      fireMouse(canvas, 'mousemove', c.x, c.y, 0, 0, 0);
+      hideNovncJunk();
     };
 
-    const enqueue = (fn: () => Promise<void>) => {
-      queue.current = queue.current.then(fn).catch(() => undefined);
-    };
-
-    const click = (mask: number) => {
-      enqueue(async () => {
-        move(pos.current.x, pos.current.y);
-        button(mask);
-        await sleep(BUTTON_HOLD_MS);
-        button(0);
-        hideNovncCapture();
-      });
-    };
-
-    const wheelStep = (mask: number) => {
-      button(mask);
-      button(0);
+    const click = (canvas: HTMLCanvasElement, button: 0 | 2, detail = 1) => {
+      const c = client(canvas);
+      const buttons = button === 0 ? 1 : 2;
+      fireMouse(canvas, 'mousemove', c.x, c.y, 0, 0, 0);
+      fireMouse(canvas, 'mousedown', c.x, c.y, buttons, button, detail);
+      fireMouse(canvas, 'mouseup', c.x, c.y, 0, button, detail);
+      hideNovncJunk();
     };
 
     const onStart = (e: TouchEvent) => {
@@ -117,8 +125,6 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
       g.fingers = Math.max(g.fingers, t.length);
       g.startTime = Date.now();
       g.moved = false;
-      g.wheelX = 0;
-      g.wheelY = 0;
       if (t.length === 1) {
         g.lastX = t[0].clientX;
         g.lastY = t[0].clientY;
@@ -142,7 +148,8 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
         g.lastY = t[0].clientY;
         if (Math.hypot(dx, dy) > 1) g.moved = true;
         pos.current = clamp(canvas, pos.current.x + dx, pos.current.y + dy);
-        move(pos.current.x, pos.current.y);
+        placeCursor(pos.current.x, pos.current.y);
+        moveRemote(canvas);
       } else if (t.length >= 2) {
         const midX = (t[0].clientX + t[1].clientX) / 2;
         const midY = (t[0].clientY + t[1].clientY) / 2;
@@ -151,16 +158,8 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
         g.lastMidX = midX;
         g.lastMidY = midY;
         if (Math.hypot(dx, dy) > 1) g.moved = true;
-        g.wheelX += -dx * SCROLL_SCALE;
-        g.wheelY += -dy * SCROLL_SCALE;
-        while (Math.abs(g.wheelX) >= WHEEL_STEP) {
-          wheelStep(g.wheelX < 0 ? WHEEL_LEFT : WHEEL_RIGHT);
-          g.wheelX -= Math.sign(g.wheelX) * WHEEL_STEP;
-        }
-        while (Math.abs(g.wheelY) >= WHEEL_STEP) {
-          wheelStep(g.wheelY < 0 ? WHEEL_UP : WHEEL_DOWN);
-          g.wheelY -= Math.sign(g.wheelY) * WHEEL_STEP;
-        }
+        const c = client(canvas);
+        fireWheel(canvas, c.x, c.y, -dx * SCROLL_SCALE, -dy * SCROLL_SCALE);
       }
     };
 
@@ -177,12 +176,23 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
       const dt = Date.now() - g.startTime;
       const tap = !g.moved && dt <= TAP_MS;
       if (tap) {
-        click(g.fingers >= 2 ? RIGHT : LEFT);
-      } else {
-        button(0);
+        if (g.fingers >= 2) {
+          click(canvas, 2);
+          g.lastTapAt = 0;
+        } else {
+          const now = Date.now();
+          const dbl = g.lastTapAt > 0 && now - g.lastTapAt <= DOUBLE_TAP_MS;
+          click(canvas, 0, dbl ? 2 : 1);
+          if (dbl) {
+            click(canvas, 0, 2);
+            g.lastTapAt = 0;
+          } else {
+            g.lastTapAt = now;
+          }
+        }
       }
       g.fingers = 0;
-      hideNovncCapture();
+      hideNovncJunk();
     };
 
     const block = (e: Event) => {
@@ -198,19 +208,18 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
     overlay.addEventListener('gesturechange', block, opts);
     overlay.addEventListener('gestureend', block, opts);
     overlay.addEventListener('dblclick', block, opts);
-    overlay.addEventListener('click', block, opts);
 
     const canvas = canvasNow();
     if (canvas) {
       const r = canvas.getBoundingClientRect();
       pos.current = { x: r.width / 2, y: r.height / 2 };
-      move(pos.current.x, pos.current.y);
+      placeCursor(pos.current.x, pos.current.y);
+      moveRemote(canvas);
     }
-    hideNovncCapture();
+    hideNovncJunk();
 
     return () => {
-      button(0);
-      hideNovncCapture();
+      hideNovncJunk();
       overlay.removeEventListener('touchstart', onStart, opts);
       overlay.removeEventListener('touchmove', onMove, opts);
       overlay.removeEventListener('touchend', onEnd, opts);
@@ -219,9 +228,8 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
       overlay.removeEventListener('gesturechange', block, opts);
       overlay.removeEventListener('gestureend', block, opts);
       overlay.removeEventListener('dblclick', block, opts);
-      overlay.removeEventListener('click', block, opts);
     };
-  }, [enabled, hostRef, rfbRef]);
+  }, [enabled, hostRef]);
 
   if (!enabled) return null;
 
@@ -229,11 +237,23 @@ export function VncTouchPad({ hostRef, rfbRef, enabled }: VncTouchPadProps) {
     <div
       ref={overlayRef}
       className="absolute inset-0 z-10"
-      style={{
-        touchAction: 'none',
-        WebkitUserSelect: 'none',
-        userSelect: 'none',
-      }}
-    />
+      style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+    >
+      <div
+        ref={cursorRef}
+        className="pointer-events-none absolute top-0 left-0"
+        aria-hidden
+      >
+        <svg width="18" height="22" viewBox="0 0 18 22" fill="none">
+          <path
+            d="M1.5 1.5 L1.5 17.5 L6.2 13.2 L9.8 20.6 L12.4 19.4 L8.7 12.1 L15.2 12.1 Z"
+            fill="white"
+            stroke="black"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    </div>
   );
 }
