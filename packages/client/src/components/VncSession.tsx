@@ -230,7 +230,7 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
           style={{ background: '#000', touchAction: touchMode === 'touchpad' ? 'none' : undefined }}
         >
           <div ref={containerRef} className="absolute inset-0" />
-          <VncTouchPad hostRef={containerRef} rfbRef={rfbRef} enabled={status === 'connected' && touchMode === 'touchpad'} />
+          <VncTouchPad hostRef={containerRef} enabled={status === 'connected' && touchMode === 'touchpad'} />
         </div>
         <VncControlPanel
           rfbRef={rfbRef}
