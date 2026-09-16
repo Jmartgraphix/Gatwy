@@ -18,7 +18,7 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 **Touchpad leftover-finger (confirmed):** `20405fd` — leftover finger stays in scroll; cursor no longer jumps to the top.
 
-**Desktop vs touch UI (in test):** Show Touchscreen / Touchpad only when `(pointer: coarse)`. Desktop never mounts overlays (so a saved iPad “touchpad” preference cannot cover the mouse). Phones and tablets keep the toggle. Same check as the mobile keyboard FAB. Do **not** use `maxTouchPoints`.
+**Desktop vs touch UI:** Gate Touch Input and overlays with `useIsMobile()` — `(hover: none) and (pointer: coarse)` — same as Sidebar edit/delete. Desktop and hover-capable hybrids never mount overlays. Phones/tablets keep the toggle. Stored touchscreen vs touchpad preference is unchanged.
 
 Keep:
 

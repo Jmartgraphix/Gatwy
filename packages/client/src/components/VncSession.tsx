@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { getWsTicket } from '../lib/wsTicket';
 import { DisconnectOverlay } from './DisconnectOverlay';
@@ -7,7 +7,8 @@ import { VncMobileKeyboard } from './VncMobileKeyboard';
 import { VncTouchPad } from './VncTouchPad';
 import { VncTwoFingerScroll } from './VncTwoFingerScroll';
 import { applyVncPointerMap } from '../lib/vncPointerMap';
-import { isCoarsePointer, loadVncTouchMode, saveVncTouchMode, type VncTouchMode } from '../lib/vncTouchMode';
+import { loadVncTouchMode, saveVncTouchMode, type VncTouchMode } from '../lib/vncTouchMode';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 interface VncSessionProps {
   connectionId: string;
@@ -25,8 +26,8 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   const [reconnectCount, setReconnectCount] = useState(0);
-  const isTouch = useMemo(() => isCoarsePointer(), []);
-  const [touchMode, setTouchMode] = useState<VncTouchMode>(() => (isCoarsePointer() ? loadVncTouchMode() : 'touchscreen'));
+  const isTouch = useIsMobile();
+  const [touchMode, setTouchMode] = useState<VncTouchMode>(loadVncTouchMode);
 
   function setAndNotify(s: 'connecting' | 'connected' | 'disconnected') {
     setStatus(s);
