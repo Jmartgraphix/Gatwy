@@ -71,7 +71,8 @@ Do not reintroduce:
 | Cursor lock (`33644d7`) | Wander reduced. Still slow: noVNC `WHEEL_STEP` is 50px and leftover delta is thrown away. |
 | Extra wheel notches + touchscreen intercept (`ff4c729`) | Touchscreen faster. Touchpad still slower; leftover finger jumped cursor to top of screen. |
 | Leftover-finger stays in scroll / ignore 1-finger start while locked (`20405fd`) | **Cursor stays put.** Scroll usable. |
-| Hide Touch UI unless `(pointer: coarse)` (this change) | TBD. |
+| Hide Touch UI unless `(pointer: coarse)` (`f9e5f53`) | Desktop hid Touch; hybrid coarse+hover could still disagree with Sidebar. |
+| Gate Touch Input with `useIsMobile()` / `COARSE_NO_HOVER` (this change) | TBD. |
 
 ## Moonlight (iOS relative / trackpad) — what we copied
 
