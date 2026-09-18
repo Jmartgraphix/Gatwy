@@ -73,7 +73,8 @@ Do not reintroduce:
 | Leftover-finger stays in scroll / ignore 1-finger start while locked (`20405fd`) | **Cursor stays put.** Scroll usable. |
 | Hide Touch UI unless `(pointer: coarse)` (`f9e5f53`) | Desktop hid Touch; hybrid coarse+hover could still disagree with Sidebar. |
 | Gate Touch Input with `useIsCoarsePointer()` / `COARSE_NO_HOVER` | TBD. |
-| noVNC iOS fallback cursor on top of remote pointer (after LMB-unmount fix) | Visible arrow slightly above the real click point. Hide fallback canvas in touchpad mode. |
+| Hide noVNC iOS fallback cursor (`820ba30`) | **Cursor vanished.** Reverted. Remote framebuffer pointer is the only cursor; do not hide noVNC sprites. |
+| Unmount mouseup only while dragging (redo of LMB nit) | TBD — must not hide/misalign cursor. |
 
 ## Moonlight (iOS relative / trackpad) — what we copied
 
