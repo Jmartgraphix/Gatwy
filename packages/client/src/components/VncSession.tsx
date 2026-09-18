@@ -8,7 +8,7 @@ import { VncTouchPad } from './VncTouchPad';
 import { VncTwoFingerScroll } from './VncTwoFingerScroll';
 import { applyVncPointerMap } from '../lib/vncPointerMap';
 import { loadVncTouchMode, saveVncTouchMode, type VncTouchMode } from '../lib/vncTouchMode';
-import { useIsMobile } from '../hooks/useIsMobile';
+import { useIsCoarsePointer } from '../hooks/useIsCoarsePointer';
 
 interface VncSessionProps {
   connectionId: string;
@@ -26,7 +26,7 @@ export function VncSession({ connectionId, connectionName, isActive, onStatusCha
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [errorMsg, setErrorMsg] = useState('');
   const [reconnectCount, setReconnectCount] = useState(0);
-  const isTouch = useIsMobile();
+  const isTouch = useIsCoarsePointer();
   const [touchMode, setTouchMode] = useState<VncTouchMode>(loadVncTouchMode);
 
   function setAndNotify(s: 'connecting' | 'connected' | 'disconnected') {

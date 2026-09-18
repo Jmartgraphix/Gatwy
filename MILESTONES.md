@@ -18,7 +18,7 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 **Touchpad leftover-finger (confirmed):** `20405fd` — leftover finger stays in scroll; cursor no longer jumps to the top.
 
-**Desktop vs touch UI:** Gate Touch Input and overlays with `useIsMobile()` — `(hover: none) and (pointer: coarse)` — same as Sidebar edit/delete. Desktop and hover-capable hybrids never mount overlays. Phones/tablets keep the toggle. Stored touchscreen vs touchpad preference is unchanged.
+**Desktop vs touch UI:** Gate Touch Input and overlays with `useIsCoarsePointer()` / `isCoarsePointer()` — `(hover: none) and (pointer: coarse)` — same as Sidebar edit/delete. Desktop and hover-capable hybrids never mount overlays. Phones/tablets keep the toggle. Stored touchscreen vs touchpad preference is unchanged.
 
 Keep:
 
@@ -72,7 +72,7 @@ Do not reintroduce:
 | Extra wheel notches + touchscreen intercept (`ff4c729`) | Touchscreen faster. Touchpad still slower; leftover finger jumped cursor to top of screen. |
 | Leftover-finger stays in scroll / ignore 1-finger start while locked (`20405fd`) | **Cursor stays put.** Scroll usable. |
 | Hide Touch UI unless `(pointer: coarse)` (`f9e5f53`) | Desktop hid Touch; hybrid coarse+hover could still disagree with Sidebar. |
-| Gate Touch Input with `useIsMobile()` / `COARSE_NO_HOVER` (this change) | TBD. |
+| Gate Touch Input with `useIsCoarsePointer()` / `COARSE_NO_HOVER` | TBD. |
 
 ## Moonlight (iOS relative / trackpad) — what we copied
 
