@@ -19,6 +19,22 @@ function canvasOf(host: HTMLDivElement | null): HTMLCanvasElement | null {
   return host?.querySelector('canvas') ?? null;
 }
 
+/** noVNC's iOS fallback cursor (fixed canvas on document.body). Hide it in
+ *  touchpad mode so only the remote framebuffer pointer is visible. */
+function novncFallbackCursors(): HTMLCanvasElement[] {
+  return [...document.body.children].filter((el): el is HTMLCanvasElement =>
+    el instanceof HTMLCanvasElement &&
+    el.style.position === 'fixed' &&
+    el.style.pointerEvents === 'none',
+  );
+}
+
+function setFallbackCursorHidden(hidden: boolean): void {
+  for (const el of novncFallbackCursors()) {
+    el.style.visibility = hidden ? 'hidden' : '';
+  }
+}
+
 function fireMouse(
   canvas: HTMLCanvasElement,
   type: 'mousemove' | 'mousedown' | 'mouseup',
@@ -113,6 +129,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     const sendMove = (canvas: HTMLCanvasElement, buttons: number) => {
       const c = clientOf(canvas, pos.current.x, pos.current.y);
       fireMouse(canvas, 'mousemove', c.x, c.y, buttons, 0);
+      setFallbackCursorHidden(true);
     };
 
     const mouseDown = (canvas: HTMLCanvasElement) => {
@@ -122,6 +139,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       fireMouse(canvas, 'mousemove', c.x, c.y, 0);
       fireMouse(canvas, 'mousedown', c.x, c.y, 1, 0);
       g.dragging = true;
+      setFallbackCursorHidden(true);
     };
 
     const mouseUp = (canvas: HTMLCanvasElement) => {
@@ -131,6 +149,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       fireMouse(canvas, 'mouseup', c.x, c.y, 0, 0);
       releaseCapture(c.x, c.y, 0);
       g.dragging = false;
+      setFallbackCursorHidden(true);
     };
 
     const click = (canvas: HTMLCanvasElement, button: 0 | 2) => {
@@ -140,6 +159,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
       fireMouse(canvas, 'mousedown', c.x, c.y, buttons, button);
       fireMouse(canvas, 'mouseup', c.x, c.y, 0, button);
       releaseCapture(c.x, c.y, button);
+      setFallbackCursorHidden(true);
     };
 
     const onStart = (e: TouchEvent) => {
@@ -309,15 +329,17 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     overlay.addEventListener('click', block, opts);
 
     const canvas = canvasNow();
-    if (canvas) {
+    if (canvas && pos.current.x === 0 && pos.current.y === 0) {
       const r = canvas.getBoundingClientRect();
       pos.current = { x: r.width / 2, y: r.height / 2 };
     }
+    setFallbackCursorHidden(true);
 
     return () => {
       clearHold();
       const canvas = canvasNow();
       if (canvas) mouseUp(canvas);
+      setFallbackCursorHidden(false);
       overlay.removeEventListener('touchstart', onStart, opts);
       overlay.removeEventListener('touchmove', onMove, opts);
       overlay.removeEventListener('touchend', onEnd, opts);
@@ -336,7 +358,7 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
     <div
       ref={overlayRef}
       className="absolute inset-0 z-10"
-      style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+      style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none', cursor: 'none' }}
     />
   );
 }
