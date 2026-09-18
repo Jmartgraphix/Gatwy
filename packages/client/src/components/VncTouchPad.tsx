@@ -316,6 +316,8 @@ export function VncTouchPad({ hostRef, enabled }: VncTouchPadProps) {
 
     return () => {
       clearHold();
+      const canvas = canvasNow();
+      if (canvas) mouseUp(canvas);
       overlay.removeEventListener('touchstart', onStart, opts);
       overlay.removeEventListener('touchmove', onMove, opts);
       overlay.removeEventListener('touchend', onEnd, opts);

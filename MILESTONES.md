@@ -18,7 +18,7 @@ Working notes for `feat/vnc-touch-mode`. Rebuild from this branch, then hard-ref
 
 **Touchpad leftover-finger (confirmed):** `20405fd` — leftover finger stays in scroll; cursor no longer jumps to the top.
 
-**Desktop vs touch UI:** Gate Touch Input and overlays with `useIsCoarsePointer()` / `isCoarsePointer()` — `(hover: none) and (pointer: coarse)` — same as Sidebar edit/delete. Desktop and hover-capable hybrids never mount overlays. Phones/tablets keep the toggle. Stored touchscreen vs touchpad preference is unchanged.
+**Desktop vs touch UI:** Gate Touch Input and overlays with `useIsCoarsePointer()` / `isCoarsePointer()` — `(hover: none) and (pointer: coarse)` — same as Sidebar edit/delete. Desktop and hover-capable hybrids never mount overlays. Phones/tablets keep the toggle. Stored touchscreen vs touchpad preference is unchanged. VNC mobile keyboard uses the same hook. Touchpad overlay cleanup sends mouseup so switching to Touchscreen mid-drag does not stick LMB.
 
 Keep:
 
